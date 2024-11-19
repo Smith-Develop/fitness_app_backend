@@ -133,10 +133,10 @@ def delete_user(
 def read_plans(
     skip: int = 0,
     limit: int = 100,
-    current_user = Depends(get_current_admin),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_admin)
 ):
-    plans = db.query(models.Plan).offset(skip).limit(limit).all()
+    plans = db.query(models.WorkoutPlan).offset(skip).limit(limit).all()
     return plans
 
 @router.get("/routines/", response_model=List[schemas.Routine])
@@ -148,6 +148,65 @@ def read_routines(
 ):
     routines = db.query(models.Routine).offset(skip).limit(limit).all()
     return routines
+
+@router.post("/routines/", response_model=schemas.Routine)
+def create_routine(
+    routine: schemas.RoutineCreate,
+    current_user = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    try:
+        db_routine = models.Routine(**routine.dict())
+        db.add(db_routine)
+        db.commit()
+        db.refresh(db_routine)
+        return db_routine
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.put("/routines/{routine_id}", response_model=schemas.Routine)
+def update_routine(
+    routine_id: int,
+    routine_data: schemas.RoutineUpdate,
+    current_user = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    db_routine = db.query(models.Routine).filter(models.Routine.id == routine_id).first()
+    if not db_routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    
+    for field, value in routine_data.dict(exclude_unset=True).items():
+        setattr(db_routine, field, value)
+    
+    try:
+        db.commit()
+        db.refresh(db_routine)
+        return db_routine
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.delete("/routines/{routine_id}")
+def delete_routine(
+    routine_id: int,
+    current_user = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    db_routine = db.query(models.Routine).filter(models.Routine.id == routine_id).first()
+    if not db_routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    
+    db.delete(db_routine)
+    db.commit()
+    return {"message": "Routine deleted"}
+
 
 @router.get("/workout-plans/", response_model=List[schemas.WorkoutPlan])
 def read_workout_plans(
@@ -231,6 +290,49 @@ async def create_admin(
     db.commit()
     db.refresh(db_admin)
     return db_admin
+
+@router.put("/admin/{admin_id}", response_model=schemas.Admin)
+async def update_admin(
+    admin_id: int,
+    admin_data: schemas.AdminUpdate,
+    current_user = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    db_admin = db.query(models.Admin).filter(models.Admin.id == admin_id).first()
+    if not db_admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    db_admin.email = admin_data.email
+    db_admin.full_name = admin_data.full_name
+    
+    if admin_data.password:
+        db_admin.hashed_password = get_password_hash(admin_data.password)
+    
+    try:
+        db.commit()
+        db.refresh(db_admin)
+        return db_admin
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@router.delete("/admin/{admin_id}")
+async def delete_admin(
+    admin_id: int,
+    current_user = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    db_admin = db.query(models.Admin).filter(models.Admin.id == admin_id).first()
+    if not db_admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    db.delete(db_admin)
+    db.commit()
+    return {"message": "Admin deleted"}
+
 
 @router.post("/request-password-reset/")
 async def request_password_reset(

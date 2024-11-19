@@ -45,6 +45,9 @@ class AdminBase(BaseModel):
 class AdminCreate(AdminBase):
     password: str
 
+class AdminUpdate(AdminBase):
+    password: Optional[str] = None
+    
 class Admin(AdminBase):
     id: int
 
@@ -77,6 +80,15 @@ class Routine(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RoutineCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+class RoutineUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+
 
 class ExerciseBase(BaseModel):
     name: str

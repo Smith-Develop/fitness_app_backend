@@ -78,6 +78,138 @@ def delete_user(
     db.commit()
     return {"message": "User deleted"}
 
+@router.get("/plans/", response_model=List[schemas.Plan])
+def read_plans(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_trainer)
+):
+    plans = db.query(models.WorkoutPlan).filter(
+        models.WorkoutPlan.trainer_id == current_user["user"].id
+    ).offset(skip).limit(limit).all()
+    return plans
+
+@router.get("/routines/", response_model=List[schemas.Routine])
+def read_routines(
+    skip: int = 0,
+    limit: int = 100,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    routines = db.query(models.Routine).filter(
+        models.Routine.trainer_id == current_user["user"].id
+    ).offset(skip).limit(limit).all()
+    return routines
+
+@router.post("/routines/", response_model=schemas.Routine)
+def create_routine(
+    routine: schemas.RoutineCreate,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    db_routine = models.Routine(
+        name=routine.name,
+        description=routine.description,
+        trainer_id=current_user["user"].id
+    )
+    db.add(db_routine)
+    db.flush()
+
+    for exercise in routine.exercises:
+        db_exercise = models.Exercise(
+            **exercise.dict(),
+            routine_id=db_routine.id
+        )
+        db.add(db_exercise)
+
+    db.commit()
+    db.refresh(db_routine)
+    return db_routine
+
+@router.put("/routines/{routine_id}", response_model=schemas.Routine)
+def update_routine(
+    routine_id: int,
+    routine: schemas.RoutineUpdate,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    db_routine = db.query(models.Routine).filter(
+        models.Routine.id == routine_id,
+        models.Routine.trainer_id == current_user["user"].id
+    ).first()
+    if not db_routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+
+    # Update routine basic info
+    for key, value in routine.dict(exclude_unset=True).items():
+        if key != "exercises":
+            setattr(db_routine, key, value)
+
+    # If exercises are provided, update them
+    if routine.exercises is not None:
+        # Delete existing exercises
+        db.query(models.Exercise).filter(models.Exercise.routine_id == routine_id).delete()
+        
+        # Add new exercises
+        for exercise in routine.exercises:
+            db_exercise = models.Exercise(
+                **exercise.dict(),
+                routine_id=routine_id
+            )
+            db.add(db_exercise)
+
+    db.commit()
+    db.refresh(db_routine)
+    return db_routine
+
+@router.delete("/routines/{routine_id}")
+def delete_routine(
+    routine_id: int,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    db_routine = db.query(models.Routine).filter(
+        models.Routine.id == routine_id,
+        models.Routine.trainer_id == current_user["user"].id
+    ).first()
+    if not db_routine:
+        raise HTTPException(status_code=404, detail="Routine not found")
+
+    # Delete associated exercises first
+    db.query(models.Exercise).filter(models.Exercise.routine_id == routine_id).delete()
+    
+    # Delete the routine
+    db.delete(db_routine)
+    db.commit()
+    
+    return {"message": "Routine deleted successfully"}
+
+
+@router.get("/workout-plans/", response_model=List[schemas.WorkoutPlan])
+def read_workout_plans(
+    skip: int = 0,
+    limit: int = 100,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    workout_plans = db.query(models.WorkoutPlan).filter(
+        models.WorkoutPlan.trainer_id == current_user["user"].id
+    ).offset(skip).limit(limit).all()
+    return workout_plans
+
+@router.get("/nutrition-plans/", response_model=List[schemas.NutritionPlan])
+def read_nutrition_plans(
+    skip: int = 0,
+    limit: int = 100,
+    current_user = Depends(get_current_trainer),
+    db: Session = Depends(get_db)
+):
+    nutrition_plans = db.query(models.NutritionPlan).filter(
+        models.NutritionPlan.trainer_id == current_user["user"].id
+    ).offset(skip).limit(limit).all()
+    return nutrition_plans
+
 @router.post("/workout-plans/", response_model=schemas.WorkoutPlan)
 def create_workout_plan(
     plan: schemas.WorkoutPlanCreate,
@@ -103,17 +235,17 @@ def create_workout_plan(
     db.refresh(db_plan)
     return db_plan
 
-@router.get("/workout-plans/", response_model=List[schemas.WorkoutPlan])
-def read_workout_plans(
-    skip: int = 0,
-    limit: int = 100,
-    current_user = Depends(get_current_trainer),
-    db: Session = Depends(get_db)
-):
-    plans = db.query(models.WorkoutPlan).filter(
-        models.WorkoutPlan.trainer_id == current_user["user"].id
-    ).offset(skip).limit(limit).all()
-    return plans
+
+
+
+
+
+
+
+
+
+
+
 
 @router.put("/workout-plans/{plan_id}", response_model=schemas.WorkoutPlan)
 def update_workout_plan(
