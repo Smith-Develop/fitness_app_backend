@@ -1,5 +1,5 @@
 # models/models.py
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, Table
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String, Text, Table
 from sqlalchemy.orm import relationship
 from config.database import Base
 
@@ -37,6 +37,8 @@ class Trainer(Base):
     users = relationship("User", back_populates="trainer")
     workout_plans = relationship("WorkoutPlan", back_populates="trainer")
     nutrition_plans = relationship("NutritionPlan", back_populates="trainer")
+    plans = relationship("Plan", back_populates="trainer")
+    routines = relationship("Routine", back_populates="trainer")
 
 class User(Base):
     __tablename__ = "users"
@@ -66,7 +68,18 @@ class Exercise(Base):
     sets = Column(Integer, nullable=False)
     reps = Column(Integer, nullable=False)
     workout_plan_id = Column(Integer, ForeignKey("workout_plans.id"))
+    routine_id = Column(Integer, ForeignKey("routines.id"))
     workout_plan = relationship("WorkoutPlan", back_populates="exercises")
+    routine = relationship("Routine", back_populates="exercises")
+
+class Routine(Base):
+    __tablename__ = "routines"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    trainer_id = Column(Integer, ForeignKey("trainers.id"))
+    trainer = relationship("Trainer", back_populates="routines")
+    exercises = relationship("Exercise", back_populates="routine")
 
 class NutritionPlan(Base):
     __tablename__ = "nutrition_plans"
@@ -86,3 +99,13 @@ class Meal(Base):
     calories = Column(Integer, nullable=False)
     nutrition_plan_id = Column(Integer, ForeignKey("nutrition_plans.id"))
     nutrition_plan = relationship("NutritionPlan", back_populates="meals")
+
+    
+class Plan(Base):
+    __tablename__ = "plans"  # o la tabla que corresponda
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    trainer_id = Column(Integer, ForeignKey("trainers.id"))
+    trainer = relationship("Trainer", back_populates="plans")
+
